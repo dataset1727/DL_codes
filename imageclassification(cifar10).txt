@@ -1,0 +1,101 @@
+# a. Loading and preprocessing the image data
+import tensorflow as tf
+from tensorflow.keras.datasets import cifar10
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+from tensorflow.keras.optimizers import SGD
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Load CIFAR-10 dataset
+(x_train, y_train), (x_test, y_test) = cifar10.load_data()
+
+# Normalize pixel values (0-255 to 0-1)
+x_train, x_test = x_train / 255.0, x_test / 255.0
+
+# Convert class labels to one-hot encoding for categorical crossentropy loss
+y_train = to_categorical(y_train, 10)
+y_test = to_categorical(y_test, 10)
+
+# b. Defining the model’s architecture
+model = Sequential([
+    # First convolutional layer: 32 filters, 3x3 kernel size, ReLU activation
+    Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)),
+    MaxPooling2D((2, 2)),  # Max pooling layer to reduce spatial dimensions
+
+    # Second convolutional layer: 64 filters, 3x3 kernel size, ReLU activation
+    Conv2D(64, (3, 3), activation='relu'),
+    MaxPooling2D((2, 2)),
+
+    # Third convolutional layer: 128 filters, 3x3 kernel size, ReLU activation
+    Conv2D(128, (3, 3), activation='relu'),
+    MaxPooling2D((2, 2)),
+
+    Flatten(),  # Flatten the 3D output to 1D for fully connected layer
+    Dense(128, activation='relu'),  # Fully connected layer with 128 neurons
+    Dense(10, activation='softmax')  # Output layer for 10 classes with softmax
+])
+
+# c. Training the model
+# Compile the model with SGD optimizer and categorical crossentropy loss
+model.compile(optimizer=SGD(learning_rate=0.01, momentum=0.9),
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Train the model with training data and validate with test data
+history = model.fit(x_train, y_train, epochs=20, batch_size=64,
+                    validation_data=(x_test, y_test))
+
+# d. Estimating the model’s performance
+# Evaluate the model on the test data to get loss and accuracy
+test_loss, test_accuracy = model.evaluate(x_test, y_test)
+print(f"Test Loss: {test_loss}")
+print(f"Test Accuracy: {test_accuracy}")
+
+# Plotting training & validation loss and accuracy
+plt.figure(figsize=(12, 4))
+
+# Plotting training & validation loss
+plt.subplot(1, 2, 1)
+plt.plot(history.history['loss'], label='Training Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.title('Loss over epochs')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+
+# Plotting training & validation accuracy
+plt.subplot(1, 2, 2)
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title('Accuracy over epochs')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+
+plt.show()
+
+# Visualize a single image and its predicted class
+# Choose a sample image from the test set
+sample_image = x_test[0]
+sample_label = y_test[0]  # Ground truth label for the sample image
+
+# Display the sample image
+plt.imshow(sample_image)
+plt.title("Sample Input Image")
+plt.axis('off')
+plt.show()
+
+# Predict the class for the sample image
+# Expand dimensions to make it compatible with the model input
+sample_image_expanded = np.expand_dims(sample_image, axis=0)
+predicted_class = np.argmax(model.predict(sample_image_expanded))
+
+# Define CIFAR-10 class names
+class_names = ["airplane", "automobile", "bird", "cat", "deer",
+               "dog", "frog", "horse", "ship", "truck"]
+
+# Show the predicted class
+print(f"Predicted class: {class_names[predicted_class]}")
+print(f"True class: {class_names[np.argmax(sample_label)]}")

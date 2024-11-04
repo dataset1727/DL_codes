@@ -1,0 +1,93 @@
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix, classification_report
+from tensorflow.keras import layers, models
+import matplotlib.pyplot as plt
+
+ecg_dataset = pd.read_csv("C:/Users/aksha/Downloads/ecg.csv")
+# Select only the numeric columns and scale the data
+scaler = StandardScaler()
+X = scaler.fit_transform(ecg_dataset.select_dtypes(np.number))
+# Autoencoder input and output are the same
+y = X  
+# Train-test split
+X_train, X_test, _, _ = train_test_split(X, X, test_size=0.2, random_state=42)
+# Define the input dimension for the autoencoder
+
+input_dim = X_train.shape[1]
+# Encoder model
+encoder = models.Sequential([
+    layers.Input(shape=(input_dim,)),
+    layers.Dense(32, activation='relu'),
+    layers.Dense(16, activation='relu'),
+    layers.Dense(8, activation='relu')
+])
+# Decoder model
+decoder = models.Sequential([
+    layers.Input(shape=(8,)),
+    layers.Dense(16, activation='relu'),
+    layers.Dense(32, activation='relu'),
+    layers.Dense(input_dim, activation='linear')  # Linear activation for reconstruction
+])
+# Full autoencoder model
+autoencoder = models.Sequential([encoder, decoder])
+autoencoder.compile(optimizer='adam', loss='mean_squared_error')
+# Train the autoencoder
+autoencoder.fit(X_train, X_train, epochs=100, batch_size=32, shuffle=True)
+# Make predictions on the test set
+y_pred = autoencoder.predict(X_test)
+
+# Calculate mean squared error (MSE) for each sample
+mse = np.mean(np.square(X_test - y_pred), axis=1)
+# Set a threshold for anomaly detection (you may adjust this based on the MSE distribution)
+threshold = np.percentile(mse, 95)  # For example, 95th percentile
+anomalies = mse > threshold  # Boolean array of anomalies
+# Count the number of anomalies
+num_anomalies = np.sum(anomalies)
+print(f"Number of Anomalies: {num_anomalies}")
+# Plot the Mean Squared Error (MSE) distribution and threshold
+plt.figure(figsize=(12, 6))
+plt.plot(mse,'o',markersize ='3', label='MSE')
+plt.axhline(threshold, linestyle = '--',color = 'r', label='Anomaly Threshold')
+plt.xlabel('Sample Index')
+plt.ylabel('MSE')
+plt.title('Anomaly Detection Results')
+plt.legend()
+plt.show()
+
+# Plot an example of a normal ECG and its reconstruction
+plt.figure(figsize=(12, 6))
+plt.plot(X_test[0], label='Original ECG')
+plt.plot(y_pred[0], label='Reconstructed ECG')
+plt.xlabel('Time')
+plt.ylabel('Amplitude')
+plt.legend()
+plt.title('Normal ECG')
+plt.show()
+
+# Plot a few examples of anomalous ECG signals and their reconstructions
+anomalies_index = np.where(anomalies)[0]  # Get indices of anomalies
+#n = 0  # Change this index to view different anomalous samples
+#if n < len(anomalies_index):
+anomaly_index = anomalies_index[0]
+plt.figure(figsize=(12, 6))
+plt.plot(X_test[anomaly_index], label='Original ECG')
+plt.plot(y_pred[anomaly_index], label='Reconstructed ECG')
+plt.xlabel('Time')
+plt.ylabel('Amplitude')
+plt.legend()
+plt.title('ECG with Anomaly')
+plt.show()
+
+# Create a binary true label array for evaluation (assuming all test samples are normal)
+y_true = np.zeros(len(X_test))
+y_pred_labels = anomalies.astype(int)  # 1 for anomaly, 0 for normal
+# Confusion matrix and classification report
+print("Confusion Matrix:")
+print(confusion_matrix(y_true, y_pred_labels))
+
+print("\nClassification Report:")
+print(classification_report(y_true, y_pred_labels))
